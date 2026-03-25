@@ -235,7 +235,7 @@ export const adminApi = {
     return result.data;
   },
 
-  async updateUser(id: string, userData: Partial<User>): Promise<User> {
+  async updateUser(_id: string, userData: Partial<User>): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/users/profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

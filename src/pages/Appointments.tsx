@@ -7,7 +7,6 @@ import {
   Clock,
   Mail,
   Phone,
-  User,
   Filter,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminApi } from '../lib/api';
-import type { Job } from '../lib/api';
 import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText } from 'lucide-react';
 
 interface CustomInput {
