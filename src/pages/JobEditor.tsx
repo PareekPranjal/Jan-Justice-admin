@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminApi } from '../lib/api';
-import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag } from 'lucide-react';
 
 interface CustomInput {
   label: string;
@@ -24,6 +24,8 @@ export default function JobEditor() {
   const [expiryDate, setExpiryDate] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number } | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
 
   // Load existing job
@@ -41,6 +43,7 @@ export default function JobEditor() {
       setPostDate(job.postDate ? job.postDate.split('T')[0] : '');
       setExpiryDate(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '');
       setExistingPdf(job.jobDescriptionPdf || null);
+      setTags(job.tags || []);
       setCustomInputs(job.customInputs || []);
     }
   }, [job]);
@@ -56,6 +59,9 @@ export default function JobEditor() {
 
       if (postDate) fd.append('postDate', postDate);
       if (expiryDate) fd.append('applicationDeadline', expiryDate);
+      if (tags.length > 0) {
+        fd.append('tags', JSON.stringify(tags));
+      }
       if (customInputs.length > 0) {
         fd.append('customInputs', JSON.stringify(customInputs.filter(ci => ci.label.trim())));
       }
@@ -108,6 +114,18 @@ export default function JobEditor() {
 
   const removeCustomInput = (index: number) => {
     setCustomInputs(customInputs.filter((_, i) => i !== index));
+  };
+
+  const addTag = () => {
+    const trimmed = tagInput.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (index: number) => {
+    setTags(tags.filter((_, i) => i !== index));
   };
 
   if (isLoading) {
@@ -298,6 +316,61 @@ export default function JobEditor() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Tags */}
+      <div className="bg-white border rounded-xl p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Tag className="h-4 w-4 text-gray-500" />
+          <h3 className="text-sm font-semibold text-gray-700">Tags / Badges</h3>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(index)}
+                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addTag();
+              }
+            }}
+            className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+            placeholder="e.g. Full-time, On-site, Urgent..."
+          />
+          <button
+            type="button"
+            onClick={addTag}
+            disabled={!tagInput.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-400">
+          Tags appear as badges on the job card. Press Enter or click Add.
+        </p>
       </div>
 
       {/* Custom Inputs */}

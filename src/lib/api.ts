@@ -105,6 +105,7 @@ export interface Job {
     size?: number;
   };
   postDate?: string;
+  tags?: string[];
   customInputs?: { label: string; value: string }[];
   tabs?: JobTab[];
   sidebarFields?: SidebarField[];
