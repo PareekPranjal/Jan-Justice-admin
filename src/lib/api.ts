@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jan-justice-bancked.onrender.com/api';
+// const API_BASE_URL = "http://localhost:5001/api";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -256,6 +257,20 @@ export const adminApi = {
       const result = await response.json();
       throw new Error(result.message || 'Failed to delete user');
     }
+  },
+
+  // Upload PDF to Cloudinary
+  async uploadPdf(file: File, jobTitle?: string): Promise<{ url: string; filename: string; size: number; publicId: string; uniqueId: string }> {
+    const fd = new FormData();
+    fd.append('pdf', file);
+    if (jobTitle) fd.append('jobTitle', jobTitle);
+    const response = await fetch(`${API_BASE_URL}/jobs/upload-pdf`, {
+      method: 'POST',
+      body: fd,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to upload PDF');
+    return result.data;
   },
 
   // Jobs
