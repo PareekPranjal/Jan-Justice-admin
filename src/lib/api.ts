@@ -275,7 +275,7 @@ export const adminApi = {
 
   // Jobs
   async getJobs(): Promise<Job[]> {
-    const response = await fetch(`${API_BASE_URL}/jobs`);
+    const response = await fetch(`${API_BASE_URL}/jobs?admin=true&limit=200`);
     const result: ApiResponse<Job[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch jobs');
     return result.data || [];

@@ -10,10 +10,15 @@ import {
   FileText,
   Building2,
   MapPin,
+  Clock,
 } from 'lucide-react';
+
+const isExpired = (deadline?: string) =>
+  deadline ? new Date(deadline) < new Date() : false;
 
 export default function Jobs() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [tab, setTab] = useState<'active' | 'expired'>('active');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -29,17 +34,20 @@ export default function Jobs() {
     },
   });
 
-  const filteredJobs = jobs.filter((job) =>
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (job.location || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this job?')) {
       await deleteJobMutation.mutateAsync(id);
     }
   };
+
+  const activeJobs = jobs.filter((j) => !isExpired(j.applicationDeadline));
+  const expiredJobs = jobs.filter((j) => isExpired(j.applicationDeadline));
+
+  const displayJobs = (tab === 'active' ? activeJobs : expiredJobs).filter((job) =>
+    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (job.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (job.location || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (isLoading) {
     return (
@@ -55,9 +63,7 @@ export default function Jobs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Jobs Management</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage job postings and applications
-          </p>
+          <p className="mt-2 text-sm text-gray-600">Manage job postings and applications</p>
         </div>
         <button
           onClick={() => navigate('/jobs/new')}
@@ -65,6 +71,33 @@ export default function Jobs() {
         >
           <Plus className="h-5 w-5" />
           Add Job
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setTab('active')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === 'active' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Active
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tab === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+            {activeJobs.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setTab('expired')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === 'expired' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Clock className="h-4 w-4" />
+          Expired
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${tab === 'expired' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>
+            {expiredJobs.length}
+          </span>
         </button>
       </div>
 
@@ -84,24 +117,35 @@ export default function Jobs() {
 
       {/* Jobs List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {filteredJobs.length === 0 ? (
+        {displayJobs.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            {searchTerm ? 'No jobs found matching your search.' : 'No jobs yet. Add your first job!'}
+            {searchTerm
+              ? 'No jobs found matching your search.'
+              : tab === 'expired'
+              ? 'No expired jobs.'
+              : 'No active jobs. Add your first job!'}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {filteredJobs.map((job) => (
-              <div
-                key={job._id}
-                className="p-6 hover:bg-gray-50 transition-colors"
-              >
+            {displayJobs.map((job) => (
+              <div key={job._id} className="p-6 hover:bg-gray-50 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 space-y-2">
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {job.title}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+                          {tab === 'expired' && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                              Expired {job.applicationDeadline ? new Date(job.applicationDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                            </span>
+                          )}
+                          {tab === 'active' && job.applicationDeadline && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                              Expires {new Date(job.applicationDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
                           <div className="flex items-center gap-1">
                             <Building2 className="h-4 w-4" />
