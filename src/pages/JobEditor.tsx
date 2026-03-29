@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminApi } from '../lib/api';
-import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, CheckCircle } from 'lucide-react';
 
 interface CustomInput {
   label: string;
@@ -23,7 +23,9 @@ export default function JobEditor() {
   const [postDate, setPostDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number } | null>(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [uploadedPdf, setUploadedPdf] = useState<{ url: string; filename: string; size: number } | null>(null);
+  const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number; publicId?: string; uniqueId?: string } | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
@@ -51,21 +53,26 @@ export default function JobEditor() {
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const fd = new FormData();
-      fd.append('title', title);
-      fd.append('description', description);
-      fd.append('department', department);
-      fd.append('isActive', 'true');
+      // Use already-uploaded Cloudinary PDF or existing PDF
+      const pdfData = uploadedPdf || (existingPdf?.url ? existingPdf as { url: string; filename?: string; size?: number } : null);
 
-      if (postDate) fd.append('postDate', postDate);
-      if (expiryDate) fd.append('applicationDeadline', expiryDate);
-      if (tags.length > 0) {
-        fd.append('tags', JSON.stringify(tags));
+      // Post job as JSON with Cloudinary URL
+      const jobData: Record<string, unknown> = {
+        title,
+        description,
+        department,
+        isActive: true,
+      };
+      if (postDate) jobData.postDate = postDate;
+      if (expiryDate) jobData.applicationDeadline = expiryDate;
+      if (tags.length > 0) jobData.tags = tags;
+      if (customInputs.length > 0) jobData.customInputs = customInputs.filter(ci => ci.label.trim());
+      if (pdfData) jobData.jobDescriptionPdf = pdfData;
+
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(jobData)) {
+        fd.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
       }
-      if (customInputs.length > 0) {
-        fd.append('customInputs', JSON.stringify(customInputs.filter(ci => ci.label.trim())));
-      }
-      if (pdfFile) fd.append('pdf', pdfFile);
 
       if (isEditing && id) {
         return adminApi.updateJob(id, fd);
@@ -172,15 +179,15 @@ export default function JobEditor() {
           )}
           <button
             onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending || !title.trim() || !department.trim()}
+            disabled={saveMutation.isPending || pdfUploading || !title.trim() || !department.trim()}
             className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {saveMutation.isPending ? (
+            {saveMutation.isPending || pdfUploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {isEditing ? 'Update Job' : 'Save Job'}
+            {pdfUploading ? 'Uploading PDF...' : isEditing ? 'Update Job' : 'Save Job'}
           </button>
         </div>
       </div>
@@ -262,24 +269,50 @@ export default function JobEditor() {
             ref={fileInputRef}
             type="file"
             accept="application/pdf"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0] || null;
               setPdfFile(file);
+              setUploadedPdf(null);
+              if (file) {
+                setPdfUploading(true);
+                try {
+                  const result = await adminApi.uploadPdf(file, title.trim() || undefined);
+                  setUploadedPdf(result);
+                } catch {
+                  setPdfFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  alert('PDF upload failed. Please try again.');
+                } finally {
+                  setPdfUploading(false);
+                }
+              }
             }}
             className="hidden"
           />
 
           {pdfFile ? (
             <div className="flex items-center gap-3 p-3 bg-gray-50 border rounded-lg">
-              <FileText className="h-5 w-5 text-red-500 shrink-0" />
+              {uploadedPdf ? (
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+              ) : pdfUploading ? (
+                <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+              ) : (
+                <FileText className="h-5 w-5 text-red-500 shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{pdfFile.name}</p>
-                <p className="text-xs text-gray-500">{(pdfFile.size / 1024).toFixed(1)} KB</p>
+                <p className="text-xs text-gray-500">
+                  {uploadedPdf
+                    ? <span>Uploaded · <span className="font-mono font-semibold text-green-600">{uploadedPdf.uniqueId}</span></span>
+                    : pdfUploading ? 'Uploading to Cloudinary...'
+                    : `${(pdfFile.size / 1024).toFixed(1)} KB · Will upload on save`}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setPdfFile(null);
+                  setUploadedPdf(null);
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
                 className="p-1 hover:bg-gray-200 rounded"
@@ -292,9 +325,10 @@ export default function JobEditor() {
               <FileText className="h-5 w-5 text-red-500 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{existingPdf.filename || 'Uploaded PDF'}</p>
-                {existingPdf.size && (
-                  <p className="text-xs text-gray-500">{(existingPdf.size / 1024).toFixed(1)} KB</p>
-                )}
+                <p className="text-xs text-gray-500">
+                  {existingPdf.size ? `${(existingPdf.size / 1024).toFixed(1)} KB` : ''}
+                  {existingPdf.uniqueId && <span> · <span className="font-mono font-semibold text-green-600">{existingPdf.uniqueId}</span></span>}
+                </p>
               </div>
               <button
                 type="button"
@@ -323,6 +357,24 @@ export default function JobEditor() {
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4 text-gray-500" />
           <h3 className="text-sm font-semibold text-gray-700">Tags / Badges</h3>
+        </div>
+
+        {/* Quick-add preset tags */}
+        <div>
+          <p className="text-xs text-gray-400 mb-2">Quick add:</p>
+          <div className="flex flex-wrap gap-2">
+            {['Full-time', 'Part-time', 'Contract', 'Internship', 'On-site', 'Remote', 'Hybrid', 'Urgent', 'Walk-in'].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                disabled={tags.includes(preset)}
+                onClick={() => setTags([...tags, preset])}
+                className="px-3 py-1 text-xs font-medium rounded-full border border-gray-300 text-gray-600 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                + {preset}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -355,7 +407,7 @@ export default function JobEditor() {
               }
             }}
             className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-            placeholder="e.g. Full-time, On-site, Urgent..."
+            placeholder="Custom tag..."
           />
           <button
             type="button"
