@@ -24,7 +24,7 @@ export default function JobEditor() {
   const [expiryDate, setExpiryDate] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
-  const [uploadedPdf, setUploadedPdf] = useState<{ url: string; filename: string; size: number } | null>(null);
+  const [uploadedPdf, setUploadedPdf] = useState<{ url: string; filename: string; size: number; publicId: string; uniqueId: string } | null>(null);
   const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number; publicId?: string; uniqueId?: string } | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
