@@ -15,32 +15,6 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
 });
 
-function ProtectedRoutes() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return <Navigate to="/login" replace />;
-
-  return (
-    <Route path="/" element={<AdminLayout />}>
-      <Route index element={<Navigate to="/dashboard" replace />} />
-      <Route path="dashboard" element={<Dashboard />} />
-      <Route path="jobs" element={<Jobs />} />
-      <Route path="jobs/new" element={<JobEditor />} />
-      <Route path="jobs/:id/edit" element={<JobEditor />} />
-      <Route path="courses" element={<Courses />} />
-      <Route path="users" element={<Users />} />
-      <Route path="appointments" element={<Appointments />} />
-    </Route>
-  );
-}
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
