@@ -1,5 +1,9 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jan-justice-bancked.onrender.com/api';
-// const API_BASE_URL = "http://localhost:5001/api";
+// const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://jan-justice-bancked.onrender.com/api';
+const API_BASE_URL = 'http://localhost:5001/api';
+const authHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 interface ApiResponse<T> {
   success: boolean;
@@ -188,11 +192,12 @@ export interface DashboardStats {
 export const adminApi = {
   // Dashboard
   async getDashboardStats(): Promise<DashboardStats> {
+    const headers = { ...authHeaders() };
     const [users, jobs, courses, appointments] = await Promise.all([
-      fetch(`${API_BASE_URL}/users`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/jobs`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/courses`).then(r => r.json()),
-      fetch(`${API_BASE_URL}/appointments`).then(r => r.json()),
+      fetch(`${API_BASE_URL}/users`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE_URL}/jobs`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE_URL}/courses`, { headers }).then(r => r.json()),
+      fetch(`${API_BASE_URL}/appointments`, { headers }).then(r => r.json()),
     ]);
 
     const pendingAppointments = appointments.data?.filter(
@@ -211,14 +216,14 @@ export const adminApi = {
 
   // Users
   async getUsers(): Promise<User[]> {
-    const response = await fetch(`${API_BASE_URL}/users`);
+    const response = await fetch(`${API_BASE_URL}/users`, { headers: authHeaders() });
     const result: ApiResponse<User[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch users');
     return result.data || [];
   },
 
   async getUser(id: string): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/users/${id}`);
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, { headers: authHeaders() });
     const result: ApiResponse<User> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch user');
     if (!result.data) throw new Error('User not found');
@@ -228,7 +233,7 @@ export const adminApi = {
   async createUser(userData: Omit<User, '_id'>): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/users/profile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(userData),
     });
     const result: ApiResponse<User> = await response.json();
@@ -240,7 +245,7 @@ export const adminApi = {
   async updateUser(_id: string, userData: Partial<User>): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/users/profile`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(userData),
     });
     const result: ApiResponse<User> = await response.json();
@@ -252,6 +257,7 @@ export const adminApi = {
   async deleteUser(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/users/${id}`, {
       method: 'DELETE',
+      headers: authHeaders(),
     });
     if (!response.ok) {
       const result = await response.json();
@@ -266,6 +272,7 @@ export const adminApi = {
     if (jobTitle) fd.append('jobTitle', jobTitle);
     const response = await fetch(`${API_BASE_URL}/jobs/upload-pdf`, {
       method: 'POST',
+      headers: authHeaders(),
       body: fd,
     });
     const result = await response.json();
@@ -275,14 +282,14 @@ export const adminApi = {
 
   // Jobs
   async getJobs(): Promise<Job[]> {
-    const response = await fetch(`${API_BASE_URL}/jobs?admin=true&limit=200`);
+    const response = await fetch(`${API_BASE_URL}/jobs?admin=true&limit=200`, { headers: authHeaders() });
     const result: ApiResponse<Job[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch jobs');
     return result.data || [];
   },
 
   async getJob(id: string): Promise<Job> {
-    const response = await fetch(`${API_BASE_URL}/jobs/${id}`);
+    const response = await fetch(`${API_BASE_URL}/jobs/${id}`, { headers: authHeaders() });
     const result: ApiResponse<Job> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch job');
     if (!result.data) throw new Error('Job not found');
@@ -292,6 +299,7 @@ export const adminApi = {
   async createJob(jobData: FormData): Promise<Job> {
     const response = await fetch(`${API_BASE_URL}/jobs`, {
       method: 'POST',
+      headers: authHeaders(),
       body: jobData,
     });
     const result: ApiResponse<Job> = await response.json();
@@ -303,6 +311,7 @@ export const adminApi = {
   async updateJob(id: string, jobData: FormData): Promise<Job> {
     const response = await fetch(`${API_BASE_URL}/jobs/${id}`, {
       method: 'PUT',
+      headers: authHeaders(),
       body: jobData,
     });
     const result: ApiResponse<Job> = await response.json();
@@ -314,6 +323,7 @@ export const adminApi = {
   async deleteJob(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/jobs/${id}`, {
       method: 'DELETE',
+      headers: authHeaders(),
     });
     if (!response.ok) {
       const result = await response.json();
@@ -323,14 +333,14 @@ export const adminApi = {
 
   // Courses
   async getCourses(): Promise<Course[]> {
-    const response = await fetch(`${API_BASE_URL}/courses`);
+    const response = await fetch(`${API_BASE_URL}/courses`, { headers: authHeaders() });
     const result: ApiResponse<Course[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch courses');
     return result.data || [];
   },
 
   async getCourse(id: string): Promise<Course> {
-    const response = await fetch(`${API_BASE_URL}/courses/${id}`);
+    const response = await fetch(`${API_BASE_URL}/courses/${id}`, { headers: authHeaders() });
     const result: ApiResponse<Course> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch course');
     if (!result.data) throw new Error('Course not found');
@@ -340,7 +350,7 @@ export const adminApi = {
   async createCourse(courseData: Omit<Course, '_id'>): Promise<Course> {
     const response = await fetch(`${API_BASE_URL}/courses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(courseData),
     });
     const result: ApiResponse<Course> = await response.json();
@@ -352,7 +362,7 @@ export const adminApi = {
   async updateCourse(id: string, courseData: Partial<Course>): Promise<Course> {
     const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(courseData),
     });
     const result: ApiResponse<Course> = await response.json();
@@ -364,6 +374,7 @@ export const adminApi = {
   async deleteCourse(id: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
       method: 'DELETE',
+      headers: authHeaders(),
     });
     if (!response.ok) {
       const result = await response.json();
@@ -373,7 +384,7 @@ export const adminApi = {
 
   // Appointments
   async getAppointments(): Promise<Appointment[]> {
-    const response = await fetch(`${API_BASE_URL}/appointments`);
+    const response = await fetch(`${API_BASE_URL}/appointments`, { headers: authHeaders() });
     const result: ApiResponse<Appointment[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch appointments');
     return result.data || [];
@@ -385,7 +396,7 @@ export const adminApi = {
   ): Promise<Appointment> {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ status }),
     });
     const result: ApiResponse<Appointment> = await response.json();
