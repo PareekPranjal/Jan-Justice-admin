@@ -297,11 +297,11 @@ export const adminApi = {
     return result.data;
   },
 
-  async createJob(jobData: FormData): Promise<Job> {
+  async createJob(jobData: Record<string, unknown>): Promise<Job> {
     const response = await fetch(`${API_BASE_URL}/jobs`, {
       method: 'POST',
-      headers: authHeaders(),
-      body: jobData,
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(jobData),
     });
     const result: ApiResponse<Job> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to create job');
@@ -309,11 +309,11 @@ export const adminApi = {
     return result.data;
   },
 
-  async updateJob(id: string, jobData: FormData): Promise<Job> {
+  async updateJob(id: string, jobData: Record<string, unknown>): Promise<Job> {
     const response = await fetch(`${API_BASE_URL}/jobs/${id}`, {
       method: 'PUT',
-      headers: authHeaders(),
-      body: jobData,
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(jobData),
     });
     const result: ApiResponse<Job> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to update job');

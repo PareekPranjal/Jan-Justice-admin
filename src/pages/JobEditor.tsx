@@ -72,15 +72,10 @@ export default function JobEditor() {
       if (customInputs.length > 0) jobData.customInputs = customInputs.filter(ci => ci.label.trim());
       if (pdfData) jobData.jobDescriptionPdf = pdfData;
 
-      const fd = new FormData();
-      for (const [key, value] of Object.entries(jobData)) {
-        fd.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
-      }
-
       if (isEditing && id) {
-        return adminApi.updateJob(id, fd);
+        return adminApi.updateJob(id, jobData);
       }
-      return adminApi.createJob(fd);
+      return adminApi.createJob(jobData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
