@@ -97,6 +97,7 @@ export interface Job {
   contactEmail?: string;
   contactPhone?: string;
   companyWebsite?: string;
+  applyUrl?: string;
   numberOfOpenings?: number;
   education?: string;
   jobDescriptionPdf?: {

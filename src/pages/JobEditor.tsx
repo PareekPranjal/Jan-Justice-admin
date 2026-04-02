@@ -26,6 +26,7 @@ export default function JobEditor() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const [uploadedPdf, setUploadedPdf] = useState<{ url: string; filename: string; size: number; publicId: string; uniqueId: string } | null>(null);
   const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number; publicId?: string; uniqueId?: string } | null>(null);
+  const [applyUrl, setApplyUrl] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
@@ -45,6 +46,7 @@ export default function JobEditor() {
       setPostDate(job.postDate ? job.postDate.split('T')[0] : '');
       setExpiryDate(job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '');
       setExistingPdf(job.jobDescriptionPdf || null);
+      setApplyUrl(job.applyUrl || '');
       setTags(job.tags || []);
       setCustomInputs(job.customInputs || []);
     }
@@ -65,6 +67,7 @@ export default function JobEditor() {
       };
       if (postDate) jobData.postDate = postDate;
       if (expiryDate) jobData.applicationDeadline = expiryDate;
+      if (applyUrl.trim()) jobData.applyUrl = applyUrl.trim();
       if (tags.length > 0) jobData.tags = tags;
       if (customInputs.length > 0) jobData.customInputs = customInputs.filter(ci => ci.label.trim());
       if (pdfData) jobData.jobDescriptionPdf = pdfData;
@@ -260,6 +263,19 @@ export default function JobEditor() {
               className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
             />
           </div>
+        </div>
+
+        {/* Apply URL */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Apply URL</label>
+          <input
+            type="url"
+            value={applyUrl}
+            onChange={(e) => setApplyUrl(e.target.value)}
+            className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+            placeholder="https://example.com/apply or original job post link"
+          />
+          <p className="text-xs text-gray-400 mt-1">Users will be redirected here when they click "Apply Now"</p>
         </div>
 
         {/* PDF Upload */}
