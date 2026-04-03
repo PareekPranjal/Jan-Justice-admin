@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminApi, type User } from '@/lib/api';
+import { adminApi, type User, type ChartPoint } from '@/lib/api';
 import {
   Plus,
   Pencil,
@@ -11,6 +11,9 @@ import {
   MapPin,
   Building2,
   X,
+  Users2,
+  CalendarDays,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,11 +21,17 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [analyticsView, setAnalyticsView] = useState<'daily' | 'monthly' | 'yearly'>('daily');
   const queryClient = useQueryClient();
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => adminApi.getUsers(),
+  });
+
+  const { data: analytics } = useQuery({
+    queryKey: ['analytics', analyticsView],
+    queryFn: () => adminApi.getAnalytics(analyticsView),
   });
 
   const deleteUserMutation = useMutation({
@@ -84,6 +93,92 @@ export default function Users() {
           <Plus className="h-5 w-5" />
           Add User
         </button>
+      </div>
+
+      {/* Visitor Analytics */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Website Visitors
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">Unique daily visitors tracked from the website</p>
+          </div>
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {(['daily', 'monthly', 'yearly'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setAnalyticsView(v)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize',
+                  analyticsView === v
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'Today', value: analytics?.summary.today ?? '—', icon: CalendarDays, color: 'bg-blue-50 text-blue-600' },
+            { label: 'This Month', value: analytics?.summary.thisMonth ?? '—', icon: Users2, color: 'bg-emerald-50 text-emerald-600' },
+            { label: 'This Year', value: analytics?.summary.thisYear ?? '—', icon: TrendingUp, color: 'bg-primary/10 text-primary' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
+              <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center shrink-0', color)}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">{label}</p>
+                <p className="text-2xl font-bold text-gray-900">{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bar Chart */}
+        {analytics?.chart && analytics.chart.length > 0 && (() => {
+          const max = Math.max(...analytics.chart.map((p: ChartPoint) => p.count), 1);
+          const showEvery = analyticsView === 'daily' ? 5 : 1;
+          return (
+            <div className="space-y-2">
+              <div className="flex items-end gap-1 h-28">
+                {analytics.chart.map((point: ChartPoint, i: number) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end group relative">
+                    <div
+                      className="w-full bg-primary/80 hover:bg-primary rounded-t transition-all duration-300 cursor-default"
+                      style={{ height: `${Math.max((point.count / max) * 100, point.count > 0 ? 4 : 0)}%` }}
+                    />
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10">
+                      {point.count} visitor{point.count !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* X-axis labels */}
+              <div className="flex gap-1">
+                {analytics.chart.map((point: ChartPoint, i: number) => (
+                  <div key={i} className="flex-1 text-center">
+                    {i % showEvery === 0 && (
+                      <span className="text-[9px] text-gray-400 block truncate">
+                        {analyticsView === 'daily'
+                          ? point.label.slice(5)   // MM-DD
+                          : point.label}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Search */}

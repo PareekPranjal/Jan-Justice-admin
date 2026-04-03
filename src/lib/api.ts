@@ -179,6 +179,24 @@ export interface Appointment {
   updatedAt?: string;
 }
 
+// Analytics Types
+export interface AnalyticsSummary {
+  today: number;
+  thisMonth: number;
+  thisYear: number;
+}
+
+export interface ChartPoint {
+  label: string;
+  count: number;
+}
+
+export interface AnalyticsData {
+  summary: AnalyticsSummary;
+  chart: ChartPoint[];
+  view: string;
+}
+
 // Statistics Types
 export interface DashboardStats {
   totalUsers: number;
@@ -389,6 +407,15 @@ export const adminApi = {
     const result: ApiResponse<Appointment[]> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch appointments');
     return result.data || [];
+  },
+
+  // Analytics
+  async getAnalytics(view: 'daily' | 'monthly' | 'yearly' = 'daily'): Promise<AnalyticsData> {
+    const response = await fetch(`${API_BASE_URL}/analytics?view=${view}`);
+    const result: ApiResponse<AnalyticsData> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch analytics');
+    if (!result.data) throw new Error('No analytics data');
+    return result.data;
   },
 
   async updateAppointmentStatus(
