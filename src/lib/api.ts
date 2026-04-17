@@ -409,6 +409,25 @@ export const adminApi = {
     return result.data || [];
   },
 
+  // Settings
+  async getSettings(): Promise<{ presetFields: string[] }> {
+    const response = await fetch(`${API_BASE_URL}/settings`, { headers: authHeaders() });
+    const result: ApiResponse<{ presetFields: string[] }> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch settings');
+    return result.data || { presetFields: ['Post Name', 'Age', 'Qualification', 'Experience', 'Salary'] };
+  },
+
+  async updateSettings(data: { presetFields: string[] }): Promise<{ presetFields: string[] }> {
+    const response = await fetch(`${API_BASE_URL}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(data),
+    });
+    const result: ApiResponse<{ presetFields: string[] }> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to update settings');
+    return result.data || data;
+  },
+
   // Analytics
   async getAnalytics(view: 'daily' | 'monthly' | 'yearly' = 'daily'): Promise<AnalyticsData> {
     const response = await fetch(`${API_BASE_URL}/analytics?view=${view}`);

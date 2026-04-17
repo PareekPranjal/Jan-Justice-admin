@@ -7,7 +7,10 @@ import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, Check
 interface CustomInput {
   label: string;
   value: string;
+  isPreset?: boolean;
 }
+
+const DEFAULT_PRESET_FIELDS = ['Post Name', 'Age', 'Qualification', 'Experience', 'Salary'];
 
 export default function JobEditor() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +33,25 @@ export default function JobEditor() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
+  const [presetFields, setPresetFields] = useState<string[]>(DEFAULT_PRESET_FIELDS);
+  const [newPresetInput, setNewPresetInput] = useState('');
+
+  // Load settings (preset fields)
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => adminApi.getSettings(),
+  });
+
+  useEffect(() => {
+    if (settings?.presetFields?.length) {
+      setPresetFields(settings.presetFields);
+    }
+  }, [settings]);
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: (fields: string[]) => adminApi.updateSettings({ presetFields: fields }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  });
 
   // Load existing job
   const { data: job, isLoading } = useQuery({
@@ -108,7 +130,39 @@ export default function JobEditor() {
 
   // Custom input handlers
   const addCustomInput = () => {
-    setCustomInputs([...customInputs, { label: '', value: '' }]);
+    setCustomInputs([...customInputs, { label: '', value: '', isPreset: false }]);
+  };
+
+  const togglePreset = (label: string) => {
+    const existingIndex = customInputs.findIndex(ci => ci.label === label);
+    if (existingIndex >= 0) {
+      setCustomInputs(customInputs.filter((_, i) => i !== existingIndex));
+    } else {
+      setCustomInputs([...customInputs, { label, value: '', isPreset: true }]);
+    }
+  };
+
+  const addPostSet = () => {
+    const toAdd = presetFields
+      .filter(label => !customInputs.some(ci => ci.label === label))
+      .map(label => ({ label, value: '', isPreset: true }));
+    setCustomInputs([...customInputs, ...toAdd]);
+  };
+
+  const addPresetField = () => {
+    const trimmed = newPresetInput.trim();
+    if (trimmed && !presetFields.includes(trimmed)) {
+      const updated = [...presetFields, trimmed];
+      setPresetFields(updated);
+      setNewPresetInput('');
+      saveSettingsMutation.mutate(updated);
+    }
+  };
+
+  const removePresetField = (label: string) => {
+    const updated = presetFields.filter(f => f !== label);
+    setPresetFields(updated);
+    saveSettingsMutation.mutate(updated);
   };
 
   const updateCustomInput = (index: number, field: 'label' | 'value', val: string) => {
@@ -374,17 +428,30 @@ export default function JobEditor() {
         <div>
           <p className="text-xs text-gray-400 mb-2">Quick add:</p>
           <div className="flex flex-wrap gap-2">
-            {['Full-time', 'Part-time', 'Contract', 'Internship', 'On-site', 'Remote', 'Hybrid', 'Urgent', 'Walk-in'].map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                disabled={tags.includes(preset)}
-                onClick={() => setTags([...tags, preset])}
-                className="px-3 py-1 text-xs font-medium rounded-full border border-gray-300 text-gray-600 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                + {preset}
-              </button>
-            ))}
+            {['Full-time', 'Part-time', 'Contract', 'Internship', 'On-site', 'Remote', 'Hybrid', 'Urgent', 'Walk-in'].map((preset) => {
+              const isAdded = tags.includes(preset);
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    if (isAdded) {
+                      setTags(tags.filter(t => t !== preset));
+                    } else {
+                      setTags([...tags, preset]);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-normal border transition-colors ${
+                    isAdded
+                      ? 'bg-primary/10 text-primary border-primary/40'
+                      : 'bg-gray-100 text-gray-800 border-gray-300 hover:border-primary hover:text-primary hover:bg-primary/5'
+                  }`}
+                >
+                  {isAdded ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                  {preset}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -392,15 +459,15 @@ export default function JobEditor() {
           {tags.map((tag, index) => (
             <span
               key={index}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-800 border border-gray-300 rounded-md text-sm font-normal"
             >
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(index)}
-                className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                className="text-gray-500 hover:text-gray-800 transition-colors"
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </span>
           ))}
@@ -437,36 +504,119 @@ export default function JobEditor() {
       </div>
 
       {/* Custom Inputs */}
-      <div className="bg-white border rounded-xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">Additional Information</h3>
-          <button
-            type="button"
-            onClick={addCustomInput}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add New Input
-          </button>
+      <div className="bg-white border rounded-xl p-6 space-y-5">
+        {/* Header */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Additional Information</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Add preset or custom fields to display on the job listing</p>
         </div>
 
-        {customInputs.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-4">
-            No additional fields. Click "Add New Input" to add custom information.
-          </p>
-        )}
+        {/* Preset quick-add */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quick Add Preset Fields</p>
 
-        <div className="space-y-3">
-          {customInputs.map((input, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <div className="flex-1 grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={input.label}
-                  onChange={(e) => updateCustomInput(index, 'label', e.target.value)}
-                  className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                  placeholder="Field name"
-                />
+          {/* Preset badges */}
+          <div className="flex flex-wrap gap-2">
+            {presetFields.map((label) => {
+              const isAdded = customInputs.some(ci => ci.label === label);
+              return (
+                <div
+                  key={label}
+                  className={`inline-flex items-center rounded-md border overflow-hidden transition-colors ${
+                    isAdded ? 'border-primary/40' : 'border-gray-300'
+                  }`}
+                >
+                  {/* Toggle button */}
+                  <button
+                    type="button"
+                    onClick={() => togglePreset(label)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-normal transition-colors ${
+                      isAdded
+                        ? 'bg-primary/10 text-primary hover:bg-primary/15'
+                        : 'bg-gray-100 text-gray-800 hover:bg-primary/5 hover:text-primary'
+                    }`}
+                  >
+                    {isAdded ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                    {label}
+                  </button>
+                  {/* Delete from palette */}
+                  <button
+                    type="button"
+                    onClick={() => removePresetField(label)}
+                    className={`px-1.5 py-1.5 border-l transition-colors ${
+                      isAdded
+                        ? 'border-primary/20 text-primary/50 hover:bg-red-50 hover:text-red-500'
+                        : 'border-gray-300 text-gray-400 hover:bg-red-50 hover:text-red-500'
+                    }`}
+                    title="Remove from preset list"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add new preset */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newPresetInput}
+              onChange={(e) => setNewPresetInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addPresetField(); } }}
+              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              placeholder="New preset label..."
+            />
+            <button
+              type="button"
+              onClick={addPresetField}
+              disabled={!newPresetInput.trim() || presetFields.includes(newPresetInput.trim())}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+          </div>
+
+          <div className="border-t border-gray-200 pt-3">
+            <button
+              type="button"
+              onClick={addPostSet}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/15 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add All Preset Fields
+            </button>
+          </div>
+        </div>
+
+        {/* Fields list */}
+        {customInputs.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Added Fields</p>
+            {customInputs.map((input, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg"
+              >
+                {/* Label */}
+                <div className="w-36 shrink-0 pt-0.5">
+                  {input.isPreset ? (
+                    <span className="inline-block px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-semibold text-gray-700 w-full text-center">
+                      {input.label}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={input.label}
+                      onChange={(e) => updateCustomInput(index, 'label', e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+                      placeholder="Field name"
+                    />
+                  )}
+                </div>
+
+                {/* Value */}
                 <textarea
                   value={input.value}
                   onChange={(e) => {
@@ -475,20 +625,38 @@ export default function JobEditor() {
                   }}
                   ref={(el) => { if (el) autoResize(el); }}
                   rows={1}
-                  className="px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden"
-                  placeholder="Value"
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden bg-white"
+                  placeholder={`Enter ${input.label || 'value'}...`}
                 />
+
+                {/* Remove */}
+                <button
+                  type="button"
+                  onClick={() => removeCustomInput(index)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors mt-0.5 shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => removeCustomInput(index)}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors mt-0.5"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {customInputs.length === 0 && (
+          <p className="text-sm text-gray-400 text-center py-2">
+            No fields added yet. Use presets above or add a custom field below.
+          </p>
+        )}
+
+        {/* Custom input button */}
+        <button
+          type="button"
+          onClick={addCustomInput}
+          className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:text-gray-800 transition-colors w-full justify-center"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add Custom Input
+        </button>
       </div>
     </div>
   );
