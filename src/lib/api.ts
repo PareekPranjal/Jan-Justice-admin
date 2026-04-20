@@ -174,6 +174,9 @@ export interface Appointment {
   notes?: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   confirmationNumber?: string;
+  transactionId?: string;
+  confirmedBy?: { userId: string; name: string };
+  actionHistory?: { action: string; adminId: string; adminName: string; note?: string; at: string }[];
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -206,6 +209,31 @@ export interface DashboardStats {
   pendingAppointments: number;
   activeJobs: number;
 }
+
+// Settings Types
+export interface CouponCode {
+  _id?: string;
+  code: string;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  isActive: boolean;
+}
+
+export interface AppSettings {
+  presetFields: string[];
+  consultationFee: number;
+  upiId: string;
+  upiQrUrl: string;
+  couponCodes: CouponCode[];
+}
+
+const defaultSettings = (): AppSettings => ({
+  presetFields: ['Post Name', 'Age', 'Qualification', 'Experience', 'Salary'],
+  consultationFee: 500,
+  upiId: '',
+  upiQrUrl: '',
+  couponCodes: [],
+});
 
 // API Client
 export const adminApi = {
@@ -410,22 +438,35 @@ export const adminApi = {
   },
 
   // Settings
-  async getSettings(): Promise<{ presetFields: string[] }> {
+  async getSettings(): Promise<AppSettings> {
     const response = await fetch(`${API_BASE_URL}/settings`, { headers: authHeaders() });
-    const result: ApiResponse<{ presetFields: string[] }> = await response.json();
+    const result: ApiResponse<AppSettings> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch settings');
-    return result.data || { presetFields: ['Post Name', 'Age', 'Qualification', 'Experience', 'Salary'] };
+    return result.data || defaultSettings();
   },
 
-  async updateSettings(data: { presetFields: string[] }): Promise<{ presetFields: string[] }> {
+  async updateSettings(data: Partial<AppSettings>): Promise<AppSettings> {
     const response = await fetch(`${API_BASE_URL}/settings`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data),
     });
-    const result: ApiResponse<{ presetFields: string[] }> = await response.json();
+    const result: ApiResponse<AppSettings> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to update settings');
-    return result.data || data;
+    return result.data || defaultSettings();
+  },
+
+  async uploadQrImage(file: File): Promise<{ url: string }> {
+    const fd = new FormData();
+    fd.append('qr', file);
+    const response = await fetch(`${API_BASE_URL}/settings/upload-qr`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to upload QR image');
+    return result.data;
   },
 
   // Analytics
@@ -439,12 +480,13 @@ export const adminApi = {
 
   async updateAppointmentStatus(
     id: string,
-    status: Appointment['status']
+    status: Appointment['status'],
+    actionBy?: { adminId: string; adminName: string }
   ): Promise<Appointment> {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(actionBy ? { actionBy } : {}) }),
     });
     const result: ApiResponse<Appointment> = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to update appointment');

@@ -8,6 +8,7 @@ import JobEditor from './pages/JobEditor';
 import Courses from './pages/Courses';
 import Users from './pages/Users';
 import Appointments from './pages/Appointments';
+import ConsultancySettings from './pages/ConsultancySettings';
 import Login from './pages/Login';
 import { Loader2 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="courses" element={<Courses />} />
         <Route path="users" element={<Users />} />
         <Route path="appointments" element={<Appointments />} />
+        <Route path="consultancy-settings" element={<ConsultancySettings />} />
       </Route>
       <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
     </Routes>

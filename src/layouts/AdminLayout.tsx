@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Briefcase, BookOpen, Users, Calendar, Menu, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Briefcase, BookOpen, Users, Calendar, Menu, X, LogOut, Settings2 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +10,7 @@ const navigation = [
   { name: 'Courses', href: '/courses', icon: BookOpen },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Appointments', href: '/appointments', icon: Calendar },
+  { name: 'Consultancy Settings', href: '/consultancy-settings', icon: Settings2 },
 ];
 
 export default function AdminLayout() {
