@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi, type CouponCode } from '@/lib/api';
-import { Plus, Trash2, Upload, IndianRupee, QrCode, Tag, Save, Check, X } from 'lucide-react';
+import { Plus, Trash2, Upload, IndianRupee, QrCode, Tag, Save, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ConsultancySettings() {
