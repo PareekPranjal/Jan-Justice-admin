@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminApi } from '../lib/api';
-import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, CheckCircle, GripVertical } from 'lucide-react';
 
 interface CustomInput {
   label: string;
@@ -27,6 +27,7 @@ export default function JobEditor() {
   const [expiryDate, setExpiryDate] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfUploading, setPdfUploading] = useState(false);
+  const [isPdfDragging, setIsPdfDragging] = useState(false);
   const [uploadedPdf, setUploadedPdf] = useState<{ url: string; filename: string; size: number; publicId: string; uniqueId: string } | null>(null);
   const [existingPdf, setExistingPdf] = useState<{ url?: string; filename?: string; size?: number; publicId?: string; uniqueId?: string } | null>(null);
   const [applyUrl, setApplyUrl] = useState('');
@@ -35,6 +36,11 @@ export default function JobEditor() {
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
   const [presetFields, setPresetFields] = useState<string[]>(DEFAULT_PRESET_FIELDS);
   const [newPresetInput, setNewPresetInput] = useState('');
+
+  // Drag-and-drop state for reordering Added Fields
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggableIndex, setDraggableIndex] = useState<number | null>(null);
 
   // Load settings (preset fields)
   const { data: settings } = useQuery({
@@ -89,9 +95,10 @@ export default function JobEditor() {
       };
       if (postDate) jobData.postDate = postDate;
       if (expiryDate) jobData.applicationDeadline = expiryDate;
-      if (applyUrl.trim()) jobData.applyUrl = applyUrl.trim();
-      if (tags.length > 0) jobData.tags = tags;
-      if (customInputs.length > 0) jobData.customInputs = customInputs.filter(ci => ci.label.trim());
+      // Always send these so clearing them on edit actually persists
+      jobData.applyUrl = applyUrl.trim();
+      jobData.tags = tags;
+      jobData.customInputs = customInputs.filter(ci => ci.label.trim());
       if (pdfData) jobData.jobDescriptionPdf = pdfData;
 
       if (isEditing && id) {
@@ -173,6 +180,67 @@ export default function JobEditor() {
 
   const removeCustomInput = (index: number) => {
     setCustomInputs(customInputs.filter((_, i) => i !== index));
+  };
+
+  const reorderCustomInputs = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0) return;
+    const updated = [...customInputs];
+    const [moved] = updated.splice(from, 1);
+    updated.splice(to, 0, moved);
+    setCustomInputs(updated);
+  };
+
+  const handleFieldDragStart = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Firefox needs data set to start a drag
+    e.dataTransfer.setData('text/plain', String(index));
+  };
+
+  const handleFieldDragOver = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    if (draggedIndex === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== index) setDragOverIndex(index);
+  };
+
+  const handleFieldDrop = (index: number) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (draggedIndex !== null) reorderCustomInputs(draggedIndex, index);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableIndex(null);
+  };
+
+  const handleFieldDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableIndex(null);
+  };
+
+  // Shared PDF upload handler — used by both file input and drag-and-drop
+  const handlePdfFile = async (file: File) => {
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Please upload a PDF file.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('PDF must be 10MB or smaller.');
+      return;
+    }
+    setPdfFile(file);
+    setUploadedPdf(null);
+    setPdfUploading(true);
+    try {
+      const result = await adminApi.uploadPdf(file, title.trim() || undefined);
+      setUploadedPdf(result);
+    } catch {
+      setPdfFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      alert('PDF upload failed. Please try again.');
+    } finally {
+      setPdfUploading(false);
+    }
   };
 
   const addTag = () => {
@@ -334,23 +402,9 @@ export default function JobEditor() {
             ref={fileInputRef}
             type="file"
             accept="application/pdf"
-            onChange={async (e) => {
-              const file = e.target.files?.[0] || null;
-              setPdfFile(file);
-              setUploadedPdf(null);
-              if (file) {
-                setPdfUploading(true);
-                try {
-                  const result = await adminApi.uploadPdf(file, title.trim() || undefined);
-                  setUploadedPdf(result);
-                } catch {
-                  setPdfFile(null);
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                  alert('PDF upload failed. Please try again.');
-                } finally {
-                  setPdfUploading(false);
-                }
-              }
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handlePdfFile(file);
             }}
             className="hidden"
           />
@@ -404,15 +458,51 @@ export default function JobEditor() {
               </button>
             </div>
           ) : (
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-8 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors flex flex-col items-center gap-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsPdfDragging(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+                if (!isPdfDragging) setIsPdfDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Only clear if leaving the dropzone itself, not a child
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                setIsPdfDragging(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsPdfDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handlePdfFile(file);
+              }}
+              className={`w-full py-8 border-2 border-dashed rounded-lg text-sm transition-colors flex flex-col items-center gap-2 cursor-pointer ${
+                isPdfDragging
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-gray-300 text-gray-500 hover:border-primary hover:text-primary'
+              }`}
             >
               <Upload className="h-6 w-6" />
-              <span>Click to upload PDF</span>
+              <span>{isPdfDragging ? 'Drop PDF here' : 'Click or drag PDF to upload'}</span>
               <span className="text-xs text-gray-400">Max 10MB</span>
-            </button>
+            </div>
           )}
         </div>
       </div>
@@ -594,51 +684,81 @@ export default function JobEditor() {
         {customInputs.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Added Fields</p>
-            {customInputs.map((input, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg"
-              >
-                {/* Label */}
-                <div className="w-36 shrink-0 pt-0.5">
-                  {input.isPreset ? (
-                    <span className="inline-block px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-semibold text-gray-700 w-full text-center">
-                      {input.label}
-                    </span>
-                  ) : (
-                    <input
-                      type="text"
-                      value={input.label}
-                      onChange={(e) => updateCustomInput(index, 'label', e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
-                      placeholder="Field name"
+            <div className="max-h-[420px] overflow-y-auto pr-1 space-y-2 scroll-smooth">
+              {customInputs.map((input, index) => {
+                const isDragging = draggedIndex === index;
+                const isDragOver = dragOverIndex === index && draggedIndex !== index;
+                return (
+                  <div
+                    key={index}
+                    draggable={draggableIndex === index}
+                    onDragStart={handleFieldDragStart(index)}
+                    onDragOver={handleFieldDragOver(index)}
+                    onDrop={handleFieldDrop(index)}
+                    onDragEnd={handleFieldDragEnd}
+                    onDragLeave={() => { if (dragOverIndex === index) setDragOverIndex(null); }}
+                    className={`flex items-start gap-2 p-3 bg-gray-50 border rounded-lg transition-all ${
+                      isDragging ? 'opacity-40' : ''
+                    } ${
+                      isDragOver ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200'
+                    }`}
+                  >
+                    {/* Drag handle */}
+                    <button
+                      type="button"
+                      onMouseDown={() => setDraggableIndex(index)}
+                      onMouseUp={() => setDraggableIndex(null)}
+                      onTouchStart={() => setDraggableIndex(index)}
+                      onTouchEnd={() => setDraggableIndex(null)}
+                      title="Drag to reorder"
+                      aria-label="Drag to reorder field"
+                      className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-md cursor-grab active:cursor-grabbing mt-0.5 shrink-0 select-none"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+
+                    {/* Label */}
+                    <div className="w-36 shrink-0 pt-0.5">
+                      {input.isPreset ? (
+                        <span className="inline-block px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-semibold text-gray-700 w-full text-center">
+                          {input.label}
+                        </span>
+                      ) : (
+                        <input
+                          type="text"
+                          value={input.label}
+                          onChange={(e) => updateCustomInput(index, 'label', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+                          placeholder="Field name"
+                        />
+                      )}
+                    </div>
+
+                    {/* Value */}
+                    <textarea
+                      value={input.value}
+                      onChange={(e) => {
+                        updateCustomInput(index, 'value', e.target.value);
+                        autoResize(e.target);
+                      }}
+                      ref={(el) => { if (el) autoResize(el); }}
+                      rows={1}
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden bg-white"
+                      placeholder={`Enter ${input.label || 'value'}...`}
                     />
-                  )}
-                </div>
 
-                {/* Value */}
-                <textarea
-                  value={input.value}
-                  onChange={(e) => {
-                    updateCustomInput(index, 'value', e.target.value);
-                    autoResize(e.target);
-                  }}
-                  ref={(el) => { if (el) autoResize(el); }}
-                  rows={1}
-                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden bg-white"
-                  placeholder={`Enter ${input.label || 'value'}...`}
-                />
-
-                {/* Remove */}
-                <button
-                  type="button"
-                  onClick={() => removeCustomInput(index)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors mt-0.5 shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+                    {/* Remove */}
+                    <button
+                      type="button"
+                      onClick={() => removeCustomInput(index)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors mt-0.5 shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

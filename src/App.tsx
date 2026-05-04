@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Jobs from './pages/Jobs';
 import JobEditor from './pages/JobEditor';
 import Courses from './pages/Courses';
+import Blogs from './pages/Blogs';
+import BlogEditor from './pages/BlogEditor';
 import Users from './pages/Users';
 import Appointments from './pages/Appointments';
 import ConsultancySettings from './pages/ConsultancySettings';
@@ -38,6 +40,9 @@ function AppRoutes() {
         <Route path="jobs/new" element={<JobEditor />} />
         <Route path="jobs/:id/edit" element={<JobEditor />} />
         <Route path="courses" element={<Courses />} />
+        <Route path="blogs" element={<Blogs />} />
+        <Route path="blogs/new" element={<BlogEditor />} />
+        <Route path="blogs/:id/edit" element={<BlogEditor />} />
         <Route path="users" element={<Users />} />
         <Route path="appointments" element={<Appointments />} />
         <Route path="consultancy-settings" element={<ConsultancySettings />} />

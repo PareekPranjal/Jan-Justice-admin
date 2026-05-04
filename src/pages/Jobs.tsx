@@ -147,14 +147,18 @@ export default function Jobs() {
                           )}
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-4 w-4" />
-                            {job.company}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {job.location}
-                          </div>
+                          {job.department && (
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-4 w-4" />
+                              {job.department}
+                            </div>
+                          )}
+                          {job.location && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-4 w-4" />
+                              {job.location}
+                            </div>
+                          )}
                           {job.jobDescriptionPdf?.url && (
                             <div className="flex items-center gap-1">
                               <FileText className="h-4 w-4" />
@@ -164,19 +168,18 @@ export default function Jobs() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                        {job.employmentType || 'Full-time'}
-                      </span>
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                        {job.department}
-                      </span>
-                      {job.workMode && (
-                        <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
-                          {job.workMode}
-                        </span>
-                      )}
-                    </div>
+                    {job.tags && job.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {job.tags.map((tag, i) => (
+                          <span
+                            key={`${tag}-${i}`}
+                            className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 rounded"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button

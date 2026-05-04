@@ -160,6 +160,27 @@ export interface Course {
   updatedAt?: string;
 }
 
+// Blog Types
+export interface BlogSection {
+  type: 'heading' | 'paragraph';
+  text: string;
+}
+
+export interface Blog {
+  _id: string;
+  title: string;
+  excerpt?: string;
+  image?: {
+    url?: string;
+    publicId?: string;
+  };
+  sections: BlogSection[];
+  isPublished: boolean;
+  isFeatured: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Appointment Types
 export interface Appointment {
   _id: string;
@@ -427,6 +448,70 @@ export const adminApi = {
       const result = await response.json();
       throw new Error(result.message || 'Failed to delete course');
     }
+  },
+
+  // Blogs
+  async getBlogs(): Promise<Blog[]> {
+    const response = await fetch(`${API_BASE_URL}/blogs?admin=true`, { headers: authHeaders() });
+    const result: ApiResponse<Blog[]> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch blogs');
+    return result.data || [];
+  },
+
+  async getBlog(id: string): Promise<Blog> {
+    const response = await fetch(`${API_BASE_URL}/blogs/${id}`, { headers: authHeaders() });
+    const result: ApiResponse<Blog> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch blog');
+    if (!result.data) throw new Error('Blog not found');
+    return result.data;
+  },
+
+  async createBlog(blogData: Partial<Blog>): Promise<Blog> {
+    const response = await fetch(`${API_BASE_URL}/blogs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(blogData),
+    });
+    const result: ApiResponse<Blog> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to create blog');
+    if (!result.data) throw new Error('Failed to create blog');
+    return result.data;
+  },
+
+  async updateBlog(id: string, blogData: Partial<Blog>): Promise<Blog> {
+    const response = await fetch(`${API_BASE_URL}/blogs/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(blogData),
+    });
+    const result: ApiResponse<Blog> = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to update blog');
+    if (!result.data) throw new Error('Failed to update blog');
+    return result.data;
+  },
+
+  async deleteBlog(id: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/blogs/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.message || 'Failed to delete blog');
+    }
+  },
+
+  async uploadBlogImage(file: File): Promise<{ url: string; publicId: string }> {
+    const fd = new FormData();
+    fd.append('image', file);
+    const response = await fetch(`${API_BASE_URL}/blogs/upload-image`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: fd,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to upload image');
+    return result.data;
   },
 
   // Appointments
