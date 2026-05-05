@@ -8,7 +8,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'Courses', href: '/courses', icon: BookOpen },
-  { name: 'Blogs', href: '/blogs', icon: Newspaper },
+  { name: 'Legal News', href: '/blogs', icon: Newspaper },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Appointments', href: '/appointments', icon: Calendar },
   { name: 'Consultancy Settings', href: '/consultancy-settings', icon: Settings2 },

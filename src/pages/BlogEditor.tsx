@@ -174,10 +174,10 @@ export default function BlogEditor() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {isEditing ? 'Edit Blog' : 'Create Blog'}
+              {isEditing ? 'Edit Article' : 'Create Article'}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              {isEditing ? 'Update blog details' : 'Write a new blog post'}
+              {isEditing ? 'Update article details' : 'Write a new Legal News article'}
             </p>
           </div>
         </div>
@@ -185,7 +185,7 @@ export default function BlogEditor() {
           {isEditing && (
             <button
               onClick={() => {
-                if (confirm('Delete this blog?')) deleteMutation.mutate();
+                if (confirm('Delete this article?')) deleteMutation.mutate();
               }}
               className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors"
             >
@@ -203,7 +203,7 @@ export default function BlogEditor() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {imageUploading ? 'Uploading...' : isEditing ? 'Update Blog' : 'Save Blog'}
+            {imageUploading ? 'Uploading...' : isEditing ? 'Update Article' : 'Save Article'}
           </button>
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function BlogEditor() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-            placeholder="Your blog title"
+            placeholder="Article title"
           />
         </div>
 
@@ -235,7 +235,7 @@ export default function BlogEditor() {
             rows={2}
             maxLength={500}
             className="w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden"
-            placeholder="Short preview shown on the blog list (optional)"
+            placeholder="Short preview shown on the article list (optional)"
           />
           <p className="text-xs text-gray-400 mt-1">{excerpt.length}/500</p>
         </div>
@@ -358,7 +358,7 @@ export default function BlogEditor() {
                 <Star className={`h-4 w-4 ${isFeatured ? 'text-amber-500 fill-current' : 'text-gray-400'}`} />
                 Featured on home page
               </p>
-              <p className="text-xs text-gray-500">Top 3 featured blogs show on the home page</p>
+              <p className="text-xs text-gray-500">Top 3 featured articles show on the home page</p>
             </div>
           </label>
         </div>

@@ -32,14 +32,14 @@ export default function Blogs() {
 
   const handleToggleFeatured = (blog: Blog) => {
     if (!blog.isFeatured && featuredCount >= FEATURED_LIMIT) {
-      alert(`You can feature at most ${FEATURED_LIMIT} blogs. Un-feature one first.`);
+      alert(`You can feature at most ${FEATURED_LIMIT} articles. Un-feature one first.`);
       return;
     }
     updateMutation.mutate({ id: blog._id, data: { isFeatured: !blog.isFeatured } });
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Delete this blog? This cannot be undone.')) {
+    if (confirm('Delete this article? This cannot be undone.')) {
       deleteMutation.mutate(id);
     }
   };
@@ -53,7 +53,7 @@ export default function Blogs() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Blogs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Legal News</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Manage articles. Up to {FEATURED_LIMIT} can be featured on the home page.
           </p>
@@ -63,7 +63,7 @@ export default function Blogs() {
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          New Blog
+          New Article
         </button>
       </div>
 
@@ -72,7 +72,7 @@ export default function Blogs() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search blogs..."
+            placeholder="Search articles..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -87,7 +87,7 @@ export default function Blogs() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            {searchTerm ? 'No blogs match your search.' : 'No blogs yet. Create your first one!'}
+            {searchTerm ? 'No articles match your search.' : 'No articles yet. Create your first one!'}
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
