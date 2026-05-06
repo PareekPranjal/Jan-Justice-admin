@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminApi } from '../lib/api';
-import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, CheckCircle, GripVertical } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2, Plus, X, Upload, FileText, Tag, CheckCircle, GripVertical, Copy, Users } from 'lucide-react';
 
 interface CustomInput {
   label: string;
@@ -10,7 +10,14 @@ interface CustomInput {
   isPreset?: boolean;
 }
 
+interface ExtraRole {
+  id: string;
+  customInputs: CustomInput[];
+}
+
 const DEFAULT_PRESET_FIELDS = ['Post Name', 'Age', 'Qualification', 'Experience', 'Salary'];
+
+const makeRoleId = () => `role-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function JobEditor() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +41,7 @@ export default function JobEditor() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [customInputs, setCustomInputs] = useState<CustomInput[]>([]);
+  const [extraRoles, setExtraRoles] = useState<ExtraRole[]>([]);
   const [presetFields, setPresetFields] = useState<string[]>(DEFAULT_PRESET_FIELDS);
   const [newPresetInput, setNewPresetInput] = useState('');
 
@@ -76,7 +84,22 @@ export default function JobEditor() {
       setExistingPdf(job.jobDescriptionPdf || null);
       setApplyUrl(job.applyUrl || '');
       setTags(job.tags || []);
-      setCustomInputs(job.customInputs || []);
+
+      // Multi-role aware loading: if job.roles has 2+, role[0] -> customInputs (Role 1), rest -> extraRoles.
+      // Otherwise fall back to legacy single-role customInputs.
+      if (job.roles && job.roles.length >= 2) {
+        const role1 = job.roles[0];
+        setCustomInputs((role1?.customInputs || []) as CustomInput[]);
+        setExtraRoles(
+          job.roles.slice(1).map(r => ({
+            id: r.id || makeRoleId(),
+            customInputs: (r.customInputs || []) as CustomInput[],
+          }))
+        );
+      } else {
+        setCustomInputs(job.customInputs || []);
+        setExtraRoles([]);
+      }
     }
   }, [job]);
 
@@ -98,7 +121,22 @@ export default function JobEditor() {
       // Always send these so clearing them on edit actually persists
       jobData.applyUrl = applyUrl.trim();
       jobData.tags = tags;
-      jobData.customInputs = customInputs.filter(ci => ci.label.trim());
+      const role1Inputs = customInputs.filter(ci => ci.label.trim());
+      // Always populate customInputs (mirror Role 1) so old display & old code paths keep working.
+      jobData.customInputs = role1Inputs;
+      // Only persist `roles` array when admin has actually added a 2nd+ role.
+      // Otherwise send empty array to clear any previously saved roles.
+      if (extraRoles.length >= 1) {
+        jobData.roles = [
+          { id: 'role-1', customInputs: role1Inputs },
+          ...extraRoles.map(r => ({
+            id: r.id,
+            customInputs: r.customInputs.filter(ci => ci.label.trim()),
+          })),
+        ];
+      } else {
+        jobData.roles = [];
+      }
       if (pdfData) jobData.jobDescriptionPdf = pdfData;
 
       if (isEditing && id) {
@@ -180,6 +218,79 @@ export default function JobEditor() {
 
   const removeCustomInput = (index: number) => {
     setCustomInputs(customInputs.filter((_, i) => i !== index));
+  };
+
+  // ---- Extra roles (Role 2, 3, …) ----
+  const addExtraRole = () => {
+    // Seed new role with the same labels as Role 1 (empty values) so user starts with the same structure.
+    const seedInputs: CustomInput[] = customInputs.map(ci => ({ label: ci.label, value: '', isPreset: ci.isPreset }));
+    setExtraRoles([...extraRoles, { id: makeRoleId(), customInputs: seedInputs }]);
+  };
+
+  const removeExtraRole = (roleIndex: number) => {
+    setExtraRoles(extraRoles.filter((_, i) => i !== roleIndex));
+  };
+
+  const updateExtraRoleInput = (roleIndex: number, fieldIndex: number, key: 'label' | 'value', val: string) => {
+    setExtraRoles(prev => prev.map((r, i) => {
+      if (i !== roleIndex) return r;
+      const updated = [...r.customInputs];
+      updated[fieldIndex] = { ...updated[fieldIndex], [key]: val };
+      return { ...r, customInputs: updated };
+    }));
+  };
+
+  const removeExtraRoleInput = (roleIndex: number, fieldIndex: number) => {
+    setExtraRoles(prev => prev.map((r, i) => i === roleIndex
+      ? { ...r, customInputs: r.customInputs.filter((_, j) => j !== fieldIndex) }
+      : r
+    ));
+  };
+
+  const addExtraRoleInput = (roleIndex: number) => {
+    setExtraRoles(prev => prev.map((r, i) => i === roleIndex
+      ? { ...r, customInputs: [...r.customInputs, { label: '', value: '', isPreset: false }] }
+      : r
+    ));
+  };
+
+  // Copy ONE field from Role 1 into the same-labelled field of the extra role.
+  // If extra role doesn't have that label yet, append it.
+  const copyFieldFromRole1 = (roleIndex: number, fieldIndex: number) => {
+    const target = extraRoles[roleIndex]?.customInputs[fieldIndex];
+    if (!target) return;
+    const source = customInputs.find(ci => ci.label === target.label);
+    if (!source) return;
+    updateExtraRoleInput(roleIndex, fieldIndex, 'value', source.value);
+  };
+
+  // Copy ALL fields from Role 1 into this extra role (replaces existing values, keeps labels).
+  const copyAllFromRole1 = (roleIndex: number) => {
+    const cloned: CustomInput[] = customInputs.map(ci => ({ label: ci.label, value: ci.value, isPreset: ci.isPreset }));
+    setExtraRoles(prev => prev.map((r, i) => i === roleIndex ? { ...r, customInputs: cloned } : r));
+  };
+
+  // Toggle a single preset field in/out of the given extra role
+  const togglePresetForExtraRole = (roleIndex: number, label: string) => {
+    setExtraRoles(prev => prev.map((r, i) => {
+      if (i !== roleIndex) return r;
+      const exists = r.customInputs.findIndex(ci => ci.label === label);
+      if (exists >= 0) {
+        return { ...r, customInputs: r.customInputs.filter((_, j) => j !== exists) };
+      }
+      return { ...r, customInputs: [...r.customInputs, { label, value: '', isPreset: true }] };
+    }));
+  };
+
+  // Add all missing preset fields (empty values) to the given extra role
+  const addPostSetForExtraRole = (roleIndex: number) => {
+    setExtraRoles(prev => prev.map((r, i) => {
+      if (i !== roleIndex) return r;
+      const toAdd = presetFields
+        .filter(label => !r.customInputs.some(ci => ci.label === label))
+        .map(label => ({ label, value: '', isPreset: true } as CustomInput));
+      return { ...r, customInputs: [...r.customInputs, ...toAdd] };
+    }));
   };
 
   const reorderCustomInputs = (from: number, to: number) => {
@@ -593,12 +704,25 @@ export default function JobEditor() {
         </p>
       </div>
 
-      {/* Custom Inputs */}
-      <div className="bg-white border rounded-xl p-6 space-y-5">
+      {/* Custom Inputs (Role 1 when multi-role mode is active) */}
+      <div className={`bg-white border rounded-xl p-6 space-y-5 ${extraRoles.length >= 1 ? 'border-blue-300 ring-1 ring-blue-100' : ''}`}>
         {/* Header */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-800">Additional Information</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Add preset or custom fields to display on the job listing</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+              {extraRoles.length >= 1 && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-bold">
+                  <Users className="h-3 w-3" /> Role 1
+                </span>
+              )}
+              Additional Information
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {extraRoles.length >= 1
+                ? 'Master role — fields here can be copied into other roles using the 📋 button.'
+                : 'Add preset or custom fields to display on the job listing'}
+            </p>
+          </div>
         </div>
 
         {/* Preset quick-add */}
@@ -778,6 +902,183 @@ export default function JobEditor() {
           Add Custom Input
         </button>
       </div>
+
+      {/* Extra Roles (Role 2, 3, ...) */}
+      {extraRoles.map((role, roleIndex) => {
+        const roleNumber = roleIndex + 2;
+        return (
+          <div key={role.id} className="bg-white border border-purple-300 ring-1 ring-purple-100 rounded-xl p-6 space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-md text-xs font-bold">
+                    <Users className="h-3 w-3" /> Role {roleNumber}
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Click <Copy className="inline h-3 w-3 -mt-0.5" /> next to a field to copy that value from Role 1.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => copyAllFromRole1(roleIndex)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                  title="Copy all values from Role 1"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy all from Role 1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeExtraRole(roleIndex)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remove
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Add Preset Fields (per role) */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Quick Add Preset Fields</p>
+              <div className="flex flex-wrap gap-2">
+                {presetFields.map((label) => {
+                  const isAdded = role.customInputs.some(ci => ci.label === label);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => togglePresetForExtraRole(roleIndex, label)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-normal border transition-colors ${
+                        isAdded
+                          ? 'bg-primary/10 text-primary border-primary/40 hover:bg-primary/15'
+                          : 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-primary/5 hover:text-primary hover:border-primary'
+                      }`}
+                    >
+                      {isAdded ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="border-t border-gray-200 pt-3">
+                <button
+                  type="button"
+                  onClick={() => addPostSetForExtraRole(roleIndex)}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/15 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add All Preset Fields
+                </button>
+              </div>
+            </div>
+
+            {/* Fields */}
+            {role.customInputs.length > 0 && (
+              <div className="space-y-2">
+                {role.customInputs.map((input, fieldIndex) => {
+                  const role1Source = customInputs.find(ci => ci.label === input.label);
+                  const canCopy = Boolean(role1Source && role1Source.value);
+                  const isSynced = canCopy && role1Source!.value === input.value && input.value !== '';
+                  return (
+                    <div
+                      key={fieldIndex}
+                      className="flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                    >
+                      {/* Per-field copy button */}
+                      <button
+                        type="button"
+                        onClick={() => copyFieldFromRole1(roleIndex, fieldIndex)}
+                        disabled={!canCopy}
+                        title={canCopy
+                          ? (isSynced ? 'Synced with Role 1' : `Copy "${role1Source?.value}" from Role 1`)
+                          : 'Role 1 has no value for this field'}
+                        className={`p-1.5 rounded-md transition-colors mt-0.5 shrink-0 border ${
+                          isSynced
+                            ? 'bg-green-100 text-green-700 border-green-200'
+                            : canCopy
+                              ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 border-dashed'
+                              : 'bg-gray-100 text-gray-300 border-gray-200 cursor-not-allowed'
+                        }`}
+                      >
+                        {isSynced ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </button>
+
+                      {/* Label */}
+                      <div className="w-36 shrink-0 pt-0.5">
+                        {input.isPreset ? (
+                          <span className="inline-block px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-semibold text-gray-700 w-full text-center">
+                            {input.label}
+                          </span>
+                        ) : (
+                          <input
+                            type="text"
+                            value={input.label}
+                            onChange={(e) => updateExtraRoleInput(roleIndex, fieldIndex, 'label', e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+                            placeholder="Field name"
+                          />
+                        )}
+                      </div>
+
+                      {/* Value */}
+                      <textarea
+                        value={input.value}
+                        onChange={(e) => {
+                          updateExtraRoleInput(roleIndex, fieldIndex, 'value', e.target.value);
+                          autoResize(e.target);
+                        }}
+                        ref={(el) => { if (el) autoResize(el); }}
+                        rows={1}
+                        className={`flex-1 px-3 py-1.5 border rounded-md text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none overflow-hidden bg-white ${
+                          isSynced ? 'border-green-300 bg-green-50' : 'border-gray-300'
+                        }`}
+                        placeholder={`Enter ${input.label || 'value'}...`}
+                      />
+
+                      {/* Remove field */}
+                      <button
+                        type="button"
+                        onClick={() => removeExtraRoleInput(roleIndex, fieldIndex)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors mt-0.5 shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {role.customInputs.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-2">
+                No fields in this role yet. Click "Copy all from Role 1" or add a custom field below.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => addExtraRoleInput(roleIndex)}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:text-gray-800 transition-colors w-full justify-center"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Custom Input to Role {roleNumber}
+            </button>
+          </div>
+        );
+      })}
+
+      {/* Add Another Role */}
+      <button
+        type="button"
+        onClick={addExtraRole}
+        className="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-dashed border-purple-300 rounded-xl hover:bg-purple-100 hover:border-purple-400 transition-colors w-full justify-center"
+      >
+        <Plus className="h-4 w-4" />
+        Add Another Role {extraRoles.length >= 1 ? `(Role ${extraRoles.length + 2})` : '(adds Role 2)'}
+      </button>
     </div>
   );
 }
